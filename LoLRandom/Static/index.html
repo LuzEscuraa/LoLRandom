@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sorteador de Campeão e Rota – LoL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #091428;
+    --panel: #0f1f3a;
+    --line: #463714;
+    --gold: #c8aa6e;
+    --gold-bright: #f0e6d2;
+    --cyan: #0ac8b9;
+    --muted: #a09b8c;
+    --danger: #ff7a7a;
+    --serif: "Cinzel", Georgia, "Times New Roman", serif;
+    --sans: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--gold-bright);
+    font-family: var(--sans); font-size: 17px; line-height: 1.5;
+    background-image: radial-gradient(ellipse at 20% 0%, #12284a 0%, transparent 55%);
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 64px; }
+  h1 { font-family: var(--serif); font-weight: 800; font-size: clamp(1.8rem, 4vw, 2.6rem);
+       margin: 0 0 4px; color: var(--gold); letter-spacing: .02em; }
+  .sub { margin: 0 0 28px; color: var(--muted); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 28px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }
+  select, button {
+    font: inherit; color: var(--gold-bright); background: var(--panel);
+    border: 1px solid var(--line); padding: 10px 14px; min-height: 44px;
+  }
+  select { min-width: 170px; }
+  button { cursor: pointer; font-weight: 600; }
+  button.primary { background: var(--gold); color: #0a1428; border-color: var(--gold); font-family: var(--serif); font-size: 1.05rem; padding-inline: 28px; }
+  button:hover:not(:disabled) { border-color: var(--gold); }
+  button.primary:hover:not(:disabled) { background: var(--gold-bright); }
+  button:disabled { opacity: .6; cursor: wait; }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  .time-group { display: flex; flex-direction: column; gap: 6px; }
+  .check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--cyan); }
+
+  .stage { display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: start; }
+  @media (max-width: 760px) { .stage { grid-template-columns: 1fr; } }
+
+  .champ { display: flex; gap: 22px; align-items: center; background: var(--panel);
+           border: 1px solid var(--line); padding: 22px; min-height: 190px; }
+  .champ img { width: 128px; height: 128px; border: 2px solid var(--gold); flex: none; background: #000; }
+  .champ.spinning img { filter: saturate(.5) blur(1px); }
+  .champ h2 { font-family: var(--serif); font-size: clamp(1.6rem, 4vw, 2.3rem); margin: 0; line-height: 1.1; }
+  .champ .title { margin: 4px 0 10px; color: var(--muted); font-style: italic; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { border: 1px solid var(--line); padding: 1px 10px; font-size: .85rem; color: var(--gold); }
+  .rota-name { margin: 14px 0 0; font-family: var(--serif); font-size: 1.25rem; color: var(--cyan); }
+
+  .map { background: var(--panel); border: 1px solid var(--line); padding: 14px; }
+  .map svg { width: 100%; height: auto; display: block; }
+  .lane { fill: none; stroke: #2a3b5c; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+  .half { fill: transparent; transition: fill .3s; }
+  svg[data-rota="top"] #l-top, svg[data-rota="mid"] #l-mid,
+  svg[data-rota="adc"] #l-bot, svg[data-rota="suporte"] #l-bot { stroke: var(--cyan); }
+  svg[data-rota="jungle"] .half { fill: rgba(10, 200, 185, .22); }
+  #pin { fill: var(--gold-bright); stroke: var(--bg); stroke-width: 2; opacity: 0; transition: opacity .3s; }
+  svg[data-rota] #pin { opacity: 1; }
+
+  .team { margin-top: 36px; }
+  .team h3 { font-family: var(--serif); color: var(--gold); margin: 0 0 12px; }
+  .team ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px;
+             grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .team li { background: var(--panel); border: 1px solid var(--line); padding: 12px; text-align: center; }
+  .team li img { width: 72px; height: 72px; border: 1px solid var(--gold); }
+  .team li strong { display: block; font-family: var(--serif); }
+  .team li span { color: var(--cyan); font-size: .95rem; }
+
+  .error { color: var(--danger); margin: 0 0 16px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sorteador de Campeão e Rota</h1>
+  <p class="sub">Sem desculpa: o que sair, você joga.</p>
+
+  <div class="controls">
+    <label>Rota
+      <select id="rota">
+        <option value="">Qualquer rota</option>
+        <option value="top">Topo</option>
+        <option value="jungle">Selva</option>
+        <option value="mid">Meio</option>
+        <option value="adc">Atirador (Bot)</option>
+        <option value="suporte">Suporte</option>
+      </select>
+    </label>
+    <label>Classe
+      <select id="classe">
+        <option value="">Qualquer classe</option>
+        <option value="Assassin">Assassino</option>
+        <option value="Fighter">Lutador</option>
+        <option value="Mage">Mago</option>
+        <option value="Marksman">Atirador</option>
+        <option value="Support">Suporte</option>
+        <option value="Tank">Tanque</option>
+      </select>
+    </label>
+    <button id="sortear" class="primary" type="button">Sortear</button>
+    <div class="time-group">
+      <button id="time" type="button">Sortear time de 5</button>
+      <label class="check"><input type="checkbox" id="limitar"> Só campeões comuns na rota</label>
+    </div>
+  </div>
+
+  <p id="erro" class="error" role="alert" hidden></p>
+
+  <section class="stage" aria-live="polite">
+    <div id="champ" class="champ">
+      <p class="title">Escolha os filtros e clique em Sortear.</p>
+    </div>
+    <div class="map">
+      <svg id="mapa" viewBox="0 0 200 200" role="img" aria-label="Minimapa com a rota sorteada em destaque">
+        <polygon class="half" points="20,20 180,20 180,180"/>
+        <polygon class="half" points="20,20 20,180 180,180"/>
+        <path id="l-top" class="lane" d="M20 180 L20 20 L180 20"/>
+        <path id="l-bot" class="lane" d="M20 180 L180 180 L180 20"/>
+        <path id="l-mid" class="lane" d="M20 180 L180 20"/>
+        <circle id="pin" r="9" cx="100" cy="100"/>
+      </svg>
+    </div>
+  </section>
+
+  <section id="time-box" class="team" hidden>
+    <h3>Seu time</h3>
+    <ul id="time-lista"></ul>
+  </section>
+</main>
+
+<script>
+  // Mesma origem da API (FastAPI serve esta página). Se abrir o arquivo direto, ajuste:
+  const API = "";
+
+  const PIN = { top: [20, 90], jungle: [100, 100], mid: [100, 100], adc: [150, 180], suporte: [120, 180] };
+  const $ = (id) => document.getElementById(id);
+  const reduzMovimento = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let campeoes = [];
+
+  async function api(caminho, params = {}) {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    const resp = await fetch(`${API}${caminho}${qs ? "?" + qs : ""}`);
+    if (!resp.ok) {
+      const corpo = await resp.json().catch(() => ({}));
+      throw new Error(corpo.detail || `Erro ${resp.status} ao falar com a API.`);
+    }
+    return resp.json();
+  }
+
+  function mostrarErro(msg) { $("erro").textContent = msg || ""; $("erro").hidden = !msg; }
+  function ocupado(sim) { document.querySelectorAll("button").forEach((b) => (b.disabled = sim)); }
+
+  function marcarRota(rota) {
+    $("mapa").dataset.rota = rota.id;
+    const [x, y] = PIN[rota.id];
+    $("pin").setAttribute("cx", x);
+    $("pin").setAttribute("cy", y);
+  }
+
+  function desenharCampeao(c, rota) {
+    const tags = c.classes.map((t) => `<span class="tag">${t}</span>`).join("");
+    $("champ").classList.remove("spinning");
+    $("champ").innerHTML = `
+      <img src="${c.icone}" alt="Ícone de ${c.nome}" width="128" height="128">
+      <div>
+        <h2></h2><p class="title"></p>
+        <div class="tags">${tags}</div>
+        <p class="rota-name"></p>
+      </div>`;
+    $("champ").querySelector("h2").textContent = c.nome;
+    $("champ").querySelector(".title").textContent = c.titulo;
+    $("champ").querySelector(".rota-name").textContent = `Rota: ${rota.nome}`;
+    marcarRota(rota);
+  }
+
+  // Efeito de "roleta" com ícones aleatórios antes de mostrar o resultado.
+  async function girar() {
+    if (reduzMovimento || !campeoes.length) return;
+    $("champ").classList.add("spinning");
+    for (let i = 0; i < 10; i++) {
+      const c = campeoes[Math.floor(Math.random() * campeoes.length)];
+      $("champ").innerHTML = `<img src="${c.icone}" alt="" width="128" height="128">`;
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  }
+
+  async function sortear() {
+    mostrarErro(""); ocupado(true);
+    try {
+      const [res] = await Promise.all([
+        api("/sortear", { rota: $("rota").value, classe: $("classe").value }),
+        girar(),
+      ]);
+      desenharCampeao(res.campeao, res.rota);
+    } catch (e) {
+      $("champ").classList.remove("spinning");
+      mostrarErro(e.message);
+    } finally { ocupado(false); }
+  }
+
+  async function sortearTime() {
+    mostrarErro(""); ocupado(true);
+    try {
+      const { time } = await api("/sortear/time", { limitar_por_rota: $("limitar").checked ? "true" : "" });
+      const lista = $("time-lista");
+      lista.replaceChildren(...time.map(({ campeao, rota }) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<img src="${campeao.icone}" alt="" width="72" height="72"><strong></strong><span></span>`;
+        li.querySelector("strong").textContent = campeao.nome;
+        li.querySelector("span").textContent = rota.nome;
+        return li;
+      }));
+      $("time-box").hidden = false;
+    } catch (e) { mostrarErro(e.message); }
+    finally { ocupado(false); }
+  }
+
+  $("sortear").addEventListener("click", sortear);
+  $("time").addEventListener("click", sortearTime);
+  api("/campeoes").then((l) => (campeoes = l)).catch(() => {});
+</script>
+</body>
+</html>
